@@ -41,9 +41,7 @@ unsigned int byte_stuffing(unsigned char *data, unsigned char *stuffed_data, int
 int sendSupervisionFrame(int fd, unsigned char C) {
 	printf("[sendSup] START\n");
 	int n_bytes = 0;
-	//unsigned char bytes[5];
-	//Este vetor de bytes corresponde à frame a ser enviada. Podiamos também usar a variável frame?
-
+	
 	unsigned char BBC1;
 
 	if(linkLayer.sequenceNumber == 1){ //se sequenceNumber for 1 o receptor "pede-nos" uma trama do tipo 1
@@ -64,10 +62,8 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 	linkLayer.frame[2] = C;
 	linkLayer.frame[3] = BBC1;
 	linkLayer.frame[4] = FLAG;
-	//Possivelmente?
-	//linkLayer.frame[5] = 0;
-
-	n_bytes = write(fd, linkLayer.frame, 5); //6?
+	
+	n_bytes = write(fd, linkLayer.frame, 5);
 	printf("%x %x %x %x %x\n",linkLayer.frame[0], linkLayer.frame[1], linkLayer.frame[2], linkLayer.frame[3], linkLayer.frame[4]);
 	printf("[sendSup] Bytes written: %d\n", n_bytes);
 	return n_bytes;
@@ -110,7 +106,7 @@ int sendInformationFrame(unsigned char * data, int length) {
 	
 	if(DEBUG) printf("[SENDINF] length After Stuffing = %d\nSending : ", lengthAfterStuffing);
 	if(DEBUG) {
-		for(i = 0 ; i < lengthAfterStuffing+6; i++)
+		for(i = 0 ; i < lengthAfterStuffing+5; i++)
 			printf("0x%x ", linkLayer.frame[i]);
 	}
 	
@@ -344,7 +340,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 	int CompleteFrames =  length / MAX_SIZE;
 	int remainingBytes =  length % MAX_SIZE;
 	int flag = 1;
-
+	printf("[LLWRITE] lenght = %d, complete Frames = %d , remaining bytes = %d\n", length, CompleteFrames, remainingBytes);
 	(void) signal(SIGALRM, atende);
 	linkLayer.numTransmissions = 0;
 	linkLayer.timeout = MAXT;
@@ -369,6 +365,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 				if(tmp == REJ_RECEIVED) {
 					if(DEBUG) printf("[LLWRITE] RECEIVED REJ\n");
 					linkLayer.numTransmissions = 0;
+					i--;
 				}
 				else return -1;
 			}
@@ -378,8 +375,9 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 			}
 
 		}
-
-
+		
+		if(DEBUG) printf("[LLWRITE] complete Frames = %d\n", i);
+		linkLayer.numTransmissions = 0;
 	}
 
 	if(remainingBytes > 0){
@@ -411,7 +409,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
        }
 
 	}
-	printf("[LLWRITE] END\n");
+	if(DEBUG) printf("[LLWRITE] END\n");
 	return 0;
 
 }
@@ -485,7 +483,8 @@ int main (int argc, char** argv) {
 	int txrx;
 	
 	linkLayer.fd = config(argv[1]);
-	//write(linkLayer.fd, "ola", 3);
+	
+	
 	printf("Reciver - 0\nTransmitter -1\n");
 	scanf("%d", &txrx);
 
