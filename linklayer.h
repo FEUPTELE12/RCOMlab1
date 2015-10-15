@@ -22,6 +22,7 @@
 #define MAXT 1 //valor do temporizador
 #define MAX_SIZE 256 //Tamanho maximo de uma frame APÓS stuffing
 
+#define DEBUG 1
 #define FLAG 0x7E
 #define ESC 0x7D
 #define STFF 0x20
@@ -80,3 +81,4 @@ int llwrite(int fd, unsigned char* buffer, int length);
 int llclose(int fd, int txrx);
 
 int main (int argc, char** argv) ;
+

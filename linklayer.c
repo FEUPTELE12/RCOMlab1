@@ -1,10 +1,4 @@
 #include "linklayer.h"
-//teste teste
-//TROLOLOLEFDFADFDFa
-
-//Nicholas Cage <3 <3s
-// ATUAMAEDEQUATRO
-//outro
 
 void atende() {
 	if(linkLayer.numTransmissions < MAXR){
@@ -25,6 +19,7 @@ unsigned int byte_stuffing(unsigned char *data, unsigned char *stuffed_data, int
 	unsigned int i;
 	unsigned int j = 0;
 	int lengthAfterStuffing = length;
+	
 	for(i = 0; i < length; i++) {
 		if (data[i] == FLAG || data[i] == ESC) { //Fazemos stuffing em 2 situações: detecção FLAG ou do byte ESC
 			stuffed_data[j] = ESC;
@@ -79,20 +74,18 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 }
 
 int sendInformationFrame(unsigned char * data, int length) {
-	printf("[sendinf] START\n");
-	unsigned char stuffed_data[MAX_SIZE-6];
-
-	if(length > MAX_SIZE/2){
-		printf("That size is too big!");
-		return -1;
-	}
-
+	if(DEBUG) printf("[SENDIF] START\n[SENDIF]length = %d", length);
+	unsigned char stuffed_data[MAX_SIZE];
 	int C = linkLayer.sequenceNumber << 6;
 	int BCC1 = A ^ C;
 	int i;
-
+	unsigned char* tmpbuffer = malloc(length +1);
+	
 	//Se não funcionar, tentar usar um buffer auxiliar para onde vai
 	//a data antes de fazer estas operações
+	
+	//[MOTA] Não funcionou porque tinhas de meter o BCC2 para stuffing também!!
+	
 
 	//De forma a calcular BBC2 simplesmente fazemos o calculo do XOR
 	//de cada byte de data com o proximo e desse resultado com o proximo.
@@ -102,19 +95,28 @@ int sendInformationFrame(unsigned char * data, int length) {
 	for(i = 1; i < length; i++){
 		BCC2 = (BCC2 ^ data[i]);
 	}
-
-	unsigned int lengthAfterStuffing = byte_stuffing(data, stuffed_data, length);
+	
+	memcpy(tmpbuffer, data, length);
+	tmpbuffer[length] = BCC2;
+	
+	unsigned int lengthAfterStuffing = byte_stuffing(tmpbuffer, stuffed_data, length+1);
 
 	linkLayer.frame[0] = FLAG;
 	linkLayer.frame[1] = A;
 	linkLayer.frame[2] = C;
 	linkLayer.frame[3] = BCC1;
-	memcpy(linkLayer.frame+4, stuffed_data, lengthAfterStuffing); //Ou linkLayer.frame+4
-	linkLayer.frame[3+lengthAfterStuffing]  = BCC2;
+	memcpy(linkLayer.frame+4, stuffed_data, lengthAfterStuffing);
 	linkLayer.frame[4+lengthAfterStuffing] = FLAG;
-
+	
+	if(DEBUG) printf("[SENDINF] length After Stuffing = %d\nSending : ", lengthAfterStuffing);
+	if(DEBUG) {
+		for(i = 0 ; i < lengthAfterStuffing+6; i++)
+			printf("0x%x ", linkLayer.frame[i]);
+	}
+	
+	if(DEBUG) printf("\n[SENDINF] END\n");
 	return (int) write(linkLayer.fd, linkLayer.frame, lengthAfterStuffing+6); // "+6" pois somamos 2FLAG,2BCC,1A,1C
-	printf("[sendinf] END\n");
+	
 }
 
 int receiveframe(char *data, int * length) {
@@ -269,6 +271,7 @@ int receiveframe(char *data, int * length) {
 			printf(",%d]", state);
 		}
 	}
+	
 	printf("[receiveframe] STOP -> %d\n", Type);
 	free(charread);
 	return Type;
@@ -284,13 +287,15 @@ int llopen(int fd, int txrx) {
 	if(txrx == TRANSMITTER) {
 
 		int tmpvar;
-		(void) signal(SIGALRM, atende);
 		linkLayer.numTransmissions = 0;
 		linkLayer.timeout = MAXT;
+		
+		(void) signal(SIGALRM, atende);
 		printf("[llopen] Send SET\n");
 		sendSupervisionFrame(fd, SET);
 		alarm(linkLayer.timeout);
 		printf("[llopen] EXPETING UA\n");
+		
 		tmpvar = receiveframe(NULL,NULL);
 		if( tmpvar != UA_RECEIVED ){
 			printf("[LLOPEN - TRANSMITTER] NOT UA\n");
@@ -298,8 +303,6 @@ int llopen(int fd, int txrx) {
 		}
 		else if(tmpvar == UA_RECEIVED) {
 			printf("[LLOPEN - TRANSMITTER] UA RECEIVED\n");
-
-
 			return fd; //retorn file ID
 		}
 		return -1;
@@ -335,7 +338,7 @@ int llread(int fd, char* buffer) {
 }
 
 int llwrite(int fd, unsigned char* buffer, int length) {
-    printf("[LLWRITE] START\n");
+    if(DEBUG) printf("[LLWRITE] START\n");
 
 	linkLayer.timeout = 0;
 	int CompleteFrames =  length / MAX_SIZE;
@@ -351,7 +354,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 
 		flag = 1;
 		while(linkLayer.numTransmissions < MAXT && flag) {
-			printf("[LLWRITE] Frames = %d\n", i);
+			if(DEBUG) printf("[LLWRITE] Frames = %d\n", i);
 
 			if(alarm_flag){
 
@@ -359,12 +362,20 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 				alarm(linkLayer.timeout);                 				// activa alarme de 3s
 				alarm_flag=0;
 			}
-
-			if(receiveframe(NULL,NULL) != RR_RECEIVED) {
-				 if(receiveframe(NULL,NULL) == REJ_RECEIVED) linkLayer.numTransmissions = 0;
-				 else return -1;
+			int tmp = receiveframe(NULL,NULL);
+			if(DEBUG) printf("[LLWRITE] tmp : %d\n", tmp);
+			if(tmp != RR_RECEIVED) {
+				if(DEBUG) printf("[LLWRITE] DID NOT RECEIVE RR\n");
+				if(tmp == REJ_RECEIVED) {
+					if(DEBUG) printf("[LLWRITE] RECEIVED REJ\n");
+					linkLayer.numTransmissions = 0;
+				}
+				else return -1;
 			}
-			else if(receiveframe(NULL,NULL) == RR_RECEIVED) flag =0;
+			else if(tmp == RR_RECEIVED) {
+				if(DEBUG) printf("[LLWRITE] RECEIVE RR\n");
+				flag =0;
+			}
 
 		}
 
@@ -372,7 +383,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 	}
 
 	if(remainingBytes > 0){
-		printf("[LLWRITE] START\n");
+		printf("[LLWRITE] BytesRemaining\n");
 		flag = 1;
 		while(linkLayer.numTransmissions < MAXT && flag) {
 
@@ -383,13 +394,21 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 				alarm_flag=0;
 			}
 
-			if(receiveframe(NULL,NULL) != RR_RECEIVED) {
-				 if(receiveframe(NULL,NULL) == REJ_RECEIVED) linkLayer.numTransmissions = 0;
-				 else return -1;
+			int tmp = receiveframe(NULL,NULL);
+			if(DEBUG) printf("[LLWRITE] tmp : %d\n", tmp);
+			if(tmp != RR_RECEIVED) {
+				if(DEBUG) printf("[LLWRITE] DID NOT RECEIVE RR\n");
+				if(tmp == REJ_RECEIVED) {
+					if(DEBUG) printf("[LLWRITE] RECEIVED REJ\n");
+					linkLayer.numTransmissions = 0;
+				}
+				else return -1;
 			}
-			else if(receiveframe(NULL,NULL) == RR_RECEIVED) flag =0;
-
-		}
+			else if(tmp == RR_RECEIVED) {
+				if(DEBUG) printf("[LLWRITE] RECEIVE RR\n");
+				flag =0;
+			}
+       }
 
 	}
 	printf("[LLWRITE] END\n");
@@ -422,7 +441,7 @@ int config(char *fd) {
 	because we don't want to get killed if linenoise sends CTRL-C.
 	*/
 
-
+	close(*fd);
 	rs = open(fd, O_RDWR | O_NOCTTY );
 	if (rs <0) {perror(fd); exit(-1); }
 
@@ -464,7 +483,7 @@ int config(char *fd) {
 
 int main (int argc, char** argv) {
 	int txrx;
-
+	
 	linkLayer.fd = config(argv[1]);
 	//write(linkLayer.fd, "ola", 3);
 	printf("Reciver - 0\nTransmitter -1\n");
@@ -476,15 +495,18 @@ int main (int argc, char** argv) {
 
 	if(txrx == TRANSMITTER)
 	{
-		unsigned char buffer[256] = "Eu Sou o jose delfim ribeiro valverdeasdasdasdasdasfasfsadfasdasdasdsafsdfasdfsadas ";
-		llwrite(linkLayer.fd, buffer, 60);
+		unsigned char buffer[100] = "ola eu sou alguem e tuaa";
+		
+		llwrite(linkLayer.fd, buffer, 22);
 	}
 	else
 	{
-		char buffer[3];
+		char buffer[20];
 		llread(fd,buffer);
 		puts(buffer);
+		
 	}
 
 	return 1;
 }
+
