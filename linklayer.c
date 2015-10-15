@@ -15,7 +15,7 @@ void atende() {
 
 
 unsigned int byte_stuffing(unsigned char *data, unsigned char *stuffed_data, int length) {
-	printf("[stuffing] START\n");
+	if(DEBUG) printf("[stuffing] START\n");
 	unsigned int i;
 	unsigned int j = 0;
 	int lengthAfterStuffing = length;
@@ -39,7 +39,7 @@ unsigned int byte_stuffing(unsigned char *data, unsigned char *stuffed_data, int
 
 
 int sendSupervisionFrame(int fd, unsigned char C) {
-	printf("[sendSup] START\n");
+	if(DEBUG) printf("[sendSup] START\n");
 	int n_bytes = 0;
 	
 	unsigned char BBC1;
@@ -52,11 +52,11 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 		}
 	}
 
-	printf("Send supervision 0x%x", C);
+	if(DEBUG) printf("Send supervision 0x%x", C);
 
 	BBC1 = A ^ C;
 
-	printf("[sendSup] A = %x, C= %x, BCC1 = %x\n", A, C, BBC1);
+	if(DEBUG) printf("[sendSup] A = %x, C= %x, BCC1 = %x\n", A, C, BBC1);
 	linkLayer.frame[0] = FLAG;
 	linkLayer.frame[1] = A;
 	linkLayer.frame[2] = C;
@@ -64,8 +64,8 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 	linkLayer.frame[4] = FLAG;
 	
 	n_bytes = write(fd, linkLayer.frame, 5);
-	printf("%x %x %x %x %x\n",linkLayer.frame[0], linkLayer.frame[1], linkLayer.frame[2], linkLayer.frame[3], linkLayer.frame[4]);
-	printf("[sendSup] Bytes written: %d\n", n_bytes);
+	if(DEBUG) printf("%x %x %x %x %x\n",linkLayer.frame[0], linkLayer.frame[1], linkLayer.frame[2], linkLayer.frame[3], linkLayer.frame[4]);
+	if(DEBUG) printf("[sendSup] Bytes written: %d\n", n_bytes);
 	return n_bytes;
 }
 
@@ -116,7 +116,7 @@ int sendInformationFrame(unsigned char * data, int length) {
 }
 
 int receiveframe(char *data, int * length) {
-	printf("[receiveframe] START\n");
+	if(DEBUG) printf("[receiveframe] START\n");
 	char* charread = malloc(1); //char in serial port
 
 	int state = 0; //state machine state
@@ -131,19 +131,19 @@ int receiveframe(char *data, int * length) {
 	while(stop == FALSE) {
 		//printf("[receiveframe] State machine -> %d\n", state);
 		Rreturn = read(linkLayer.fd, charread, 1); //read 1 char
-		if (Rreturn == 1) printf("[Receiveframe] read -> %x (%d)\n", *charread, Rreturn);
+		if (Rreturn == 1 && DEBUG) printf("[Receiveframe] read -> %x (%d)\n", *charread, Rreturn);
 		if (Rreturn < 0) return -1; //nothing
 
 		switch(state) {
 			case 0:{ //State Start
-				printf("[receiveframe] START, char = %x\n", *charread);
+				if(DEBUG) printf("[receiveframe] START, char = %x\n", *charread);
 				if(*charread == FLAG) state = 1;
 				break;
 			}
 
 			case 1:{ //Flag -> expect address
 				if(*charread == A) {
-					printf("[receiveframe] ADRESS, char = %x\n", *charread);
+					if(DEBUG)printf("[receiveframe] ADRESS, char = %x\n", *charread);
 					state = 2;
 					Aread = *charread;
 				} else if(*charread == FLAG) state = 1; //another flag
@@ -151,40 +151,40 @@ int receiveframe(char *data, int * length) {
 			}
 
 			case 2:{ //Address -> Command (many commands possible)
-				printf("[receiveframe] COMMAND, char = %x ->", *charread);
+				if(DEBUG) printf("[receiveframe] COMMAND, char = %x ->", *charread);
 				Cread = *charread;
 				if(*charread == SET)  {
-					printf("SET\n");
+					if(DEBUG) printf("SET\n");
 					Type = SET_RECEIVED;
 					state = 3;
 				}
 
 				else if(*charread == UA) {
-					printf("UA\n");
+					if(DEBUG) printf("UA\n");
 					Type = UA_RECEIVED;
 					state = 3;
 					}
 
 				else if(*charread == DISC) {
-					printf("DISC\n");
+					if(DEBUG) printf("DISC\n");
 					Type = DISC_RECEIVED;
 					state = 3;
 				}
 
 				else if(*charread == (RR | (linkLayer.sequenceNumber << 7))) {
-					printf("RR\n");
+					if(DEBUG) printf("RR\n");
 					Type = RR_RECEIVED;
 					state = 3;
 				}
 
 				else if(*charread == (REJ | (linkLayer.sequenceNumber << 7))) {
-					printf("REJ\n");
+					if(DEBUG) printf("REJ\n");
 					Type = REJ_RECEIVED;
 					state = 3;
 				}
 
 				else if(*charread == (linkLayer.sequenceNumber << 6)) {
-					printf("DATA\n");
+					if(DEBUG) printf("DATA\n");
 					Type = DATA_RECEIVED;
 					state = 3;
 				}
@@ -195,18 +195,18 @@ int receiveframe(char *data, int * length) {
 				}
 
 			case 3:{ //command -> BBC1
-				printf("[receiveframe] BCC, char = %x\n", *charread);
+				if(DEBUG) printf("[receiveframe] BCC, char = %x\n", *charread);
 				if(*charread == FLAG) state = 1;
 
 				else if(*charread != (Aread ^ Cread))
 				{
-					printf("[receiveframe] BCC INCORRECT\n");
+					if(DEBUG) printf("[receiveframe] BCC INCORRECT\n");
 					state = 0; //bcc
 				}
 
 				else
 				{
-					printf("[receiveframe] BCC CORRECT\n");
+					if(DEBUG) printf("[receiveframe] BCC CORRECT\n");
 					if(Type == DATA_RECEIVED) state = 4;
 					else state = 6;
 				}
@@ -214,7 +214,7 @@ int receiveframe(char *data, int * length) {
 			}
 
 			case 4:{ //Data expected
-				printf("[receiveframe] DATA EXPECTED\n");
+				if(DEBUG) printf("[receiveframe] DATA EXPECTED\n");
 				if (*charread == FLAG)
 					{
 						char BCC2exp = data[0];
@@ -264,11 +264,11 @@ int receiveframe(char *data, int * length) {
 				else state = 0;
 				break;
 			}
-			printf(",%d]", state);
+			if(DEBUG) printf(",%d]", state);
 		}
 	}
 	
-	printf("[receiveframe] STOP -> %d\n", Type);
+	if(DEBUG) printf("[receiveframe] STOP -> %d\n", Type);
 	free(charread);
 	return Type;
 
@@ -276,7 +276,7 @@ int receiveframe(char *data, int * length) {
 
 
 int llopen(int fd, int txrx) {
-	printf("[LLOPEN] START\n");
+	if(DEBUG) printf("[LLOPEN] START\n");
 
 	linkLayer.sequenceNumber = 0;
 
@@ -287,18 +287,18 @@ int llopen(int fd, int txrx) {
 		linkLayer.timeout = MAXT;
 		
 		(void) signal(SIGALRM, atende);
-		printf("[llopen] Send SET\n");
+		if(DEBUG) printf("[llopen] Send SET\n");
 		sendSupervisionFrame(fd, SET);
 		alarm(linkLayer.timeout);
-		printf("[llopen] EXPETING UA\n");
+		if(DEBUG) printf("[llopen] EXPETING UA\n");
 		
 		tmpvar = receiveframe(NULL,NULL);
 		if( tmpvar != UA_RECEIVED ){
-			printf("[LLOPEN - TRANSMITTER] NOT UA\n");
+			if(DEBUG) printf("[LLOPEN - TRANSMITTER] NOT UA\n");
 			return -1; //return error
 		}
 		else if(tmpvar == UA_RECEIVED) {
-			printf("[LLOPEN - TRANSMITTER] UA RECEIVED\n");
+			if(DEBUG) printf("[LLOPEN - TRANSMITTER] UA RECEIVED\n");
 			return fd; //retorn file ID
 		}
 		return -1;
@@ -307,11 +307,15 @@ int llopen(int fd, int txrx) {
 
 	else if (txrx == RECEIVER) {
 
-		printf("Waiting for SET\n");
-		if(receiveframe(NULL,NULL) == SET_RECEIVED) printf("SET_RECEIVED");
-
+		if(DEBUG) printf("Waiting for SET\n");
+		if(receiveframe(NULL,NULL) != SET_RECEIVED)
+		{
+			//TODO falta cenas;
+			 if(DEBUG) printf("DID NOT RECEIVE SET");
+			return -1;
+		}
 		sendSupervisionFrame(fd,UA);
-		printf("UA sent\n");
+		if(DEBUG) printf("UA sent\n");
 
 		return fd;
 	}
@@ -320,13 +324,13 @@ int llopen(int fd, int txrx) {
 }
 
 int llread(int fd, char* buffer) {
-	printf("[LLREAD] START\n");
+	if(DEBUG) printf("[LLREAD] START\n");
 	int num_chars_read = 0;
 
 	int Type = receiveframe(buffer, &num_chars_read);
 
 	if(Type == DATA_RECEIVED)	{
-		printf("[LLREAD] END\n");
+		if(DEBUG) printf("[LLREAD] END\n");
 		return num_chars_read;
 	}
 
@@ -340,7 +344,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 	int CompleteFrames =  length / MAX_SIZE;
 	int remainingBytes =  length % MAX_SIZE;
 	int flag = 1;
-	printf("[LLWRITE] lenght = %d, complete Frames = %d , remaining bytes = %d\n", length, CompleteFrames, remainingBytes);
+	if(DEBUG)printf("[LLWRITE] lenght = %d, complete Frames = %d , remaining bytes = %d\n", length, CompleteFrames, remainingBytes);
 	(void) signal(SIGALRM, atende);
 	linkLayer.numTransmissions = 0;
 	linkLayer.timeout = MAXT;
@@ -350,7 +354,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 
 		flag = 1;
 		while(linkLayer.numTransmissions < MAXT && flag) {
-			if(DEBUG) printf("[LLWRITE] Frames = %d\n", i);
+			if(DEBUG) if(DEBUG) printf("[LLWRITE] Frames = %d\n", i);
 
 			if(alarm_flag){
 
@@ -359,11 +363,11 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 				alarm_flag=0;
 			}
 			int tmp = receiveframe(NULL,NULL);
-			if(DEBUG) printf("[LLWRITE] tmp : %d\n", tmp);
+			if(DEBUG) if(DEBUG) printf("[LLWRITE] tmp : %d\n", tmp);
 			if(tmp != RR_RECEIVED) {
-				if(DEBUG) printf("[LLWRITE] DID NOT RECEIVE RR\n");
+				if(DEBUG) if(DEBUG) printf("[LLWRITE] DID NOT RECEIVE RR\n");
 				if(tmp == REJ_RECEIVED) {
-					if(DEBUG) printf("[LLWRITE] RECEIVED REJ\n");
+					if(DEBUG) if(DEBUG) printf("[LLWRITE] RECEIVED REJ\n");
 					linkLayer.numTransmissions = 0;
 					i--;
 				}
@@ -415,7 +419,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 }
 
 int llclose(int fd, int txrx) {
-
+	if(DEBUG);
 	return 1;
 }
 

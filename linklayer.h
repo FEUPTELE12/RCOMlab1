@@ -22,7 +22,7 @@
 #define MAXT 1 //valor do temporizador
 #define MAX_SIZE 6 //Tamanho maximo de uma frame APÓS stuffing
 
-#define DEBUG 1
+
 #define FLAG 0x7E
 #define ESC 0x7D
 #define STFF 0x20
@@ -42,6 +42,9 @@
 #define UA_RECEIVED 3
 #define RR_RECEIVED 4
 #define REJ_RECEIVED 5
+
+#define DEBUG 1
+
 
 int fd, txrx, N;
 
