@@ -24,13 +24,13 @@ int main (int argc, char** argv) {
 
 	if(txrx == 1)
 	{
-		unsigned char buffer[100] = "ola eu sou alguem e tuaa";
+		unsigned char buffer[24] = "ola eu sou alguem e tuaa";
 		
-		llwrite(fd, buffer, 100);
+		llwrite(fd, buffer, 25);
 	}
 	else
 	{
-		char buffer[20];
+		unsigned char buffer[30];
 		llread(fd,buffer);
 		puts(buffer);
 		
