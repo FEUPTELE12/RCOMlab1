@@ -24,7 +24,7 @@
 
 
 #define FLAG 0x7E
-#define ESC 0llx7D
+#define ESC 0x7D
 #define STFF 0x20
 #define SET 0x03
 #define DISC 0x0B
