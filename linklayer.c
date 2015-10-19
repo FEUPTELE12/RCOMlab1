@@ -1,18 +1,125 @@
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
 #include "linklayer.h"
 
-void atende() {
-	if(linkLayer.numTransmissions < MAXR){
-		printf("[DEBUG] Timeout %d waiting for UA, re-sending SET\n",  linkLayer.numTransmissions);
-		sendSupervisionFrame(linkLayer.fd, SET);
-		alarm(linkLayer.timeout);
-	}else{
-		printf("[DEBUG] Receiver doesnt seem to like me, I give up :(\n");
-			//llclose();
-		}
-	linkLayer.numTransmissions++;
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <stdio.h>
+
+#define BAUDRATE 9600 //38400?
+#define MODEMDEVICE "/dev/ttyS1"
+#define _POSIX_SOURCE 1 /* POSIX compliant source */
+#define FALSE 0
+#define TRUE 1
+#define MAXR 3 //no maximo de falhas
+#define MAXT 1 //valor do temporizador
+#define MAX_SIZE 250 //Tamanho maximo de uma frame APÓS stuffing
+
+
+#define FLAG 0x7E
+#define ESC 0x7D
+#define STFF 0x20
+#define SET 0x03
+#define DISC 0x0B
+#define UA 0x07 
+#define RR 0x05
+#define REJ 0x01
+#define A 0x03 //Comando enviado pelo emissor e resposta enviada pelo receptor
+
+#define RECEIVER 0
+#define TRANSMITTER 1
+
+#define DATA_RECEIVED 0
+#define SET_RECEIVED 1
+#define DISC_RECEIVED 2
+#define UA_RECEIVED 3
+#define RR_RECEIVED 4
+#define REJ_RECEIVED 5
+
+#define DEBUG 1
+
+
+int fd, txrx, N;
+
+volatile int STOP=FALSE;
+int conta = 0;
+int alarm_flag = 1;
+
+struct linkLayerStruct{
+	
+	char port[20];
+	int fd;
+	unsigned int sequenceNumber;
+	unsigned int timeout;//valor do temporizador
+	int frameLength;
+	char frame[MAX_SIZE];
+	unsigned int numTransmissions;
+	int State ;//Transmitter Reciver
+	
+}linkLayer;
+
+
+
+int config(char *fd) {
+	int c, res;
+	struct termios oldtio,newtio;
+	char buf[255];
+	int i, rs, sum = 0, speed = 0;
+
+		/*
+	if ( (argc < 2) ||
+	 	((strcmp("/dev/ttyS0", argv[1])!=0) &&
+	 	(strcmp("/dev/ttyS4", argv[1])!=0) )) {
+	 	printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+	 	exit(1);
+	 }*/
+
+
+	/*
+	Open serial port device for reading and writing and not as controlling tty
+	because we don't want to get killed if linenoise sends CTRL-C.
+	*/
+
+	close(*fd);
+	rs = open(fd, O_RDWR | O_NOCTTY );
+	if (rs <0) {perror(fd); exit(-1); }
+
+	if ( tcgetattr(rs,&oldtio) == -1) { /* save current port settings */
+		perror("tcgetattr");
+		exit(-1);
+	}
+
+	bzero(&newtio, sizeof(newtio));
+	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	newtio.c_iflag = IGNPAR;
+	newtio.c_oflag = 0;
+
+	// set input mode (non-canonical, no echo,...)
+	newtio.c_lflag = 0;
+
+	newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
+	newtio.c_cc[VMIN]     = 1;   /* blocking read until 5 chars received*/
+
+	   // VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
+	    //leitura do(s) próximo(s) caracter(es)
+
+	tcflush(rs, TCIOFLUSH);
+
+	if ( tcsetattr(rs,TCSANOW,&newtio) == -1) {
+		perror("tcsetattr");
+		exit(-1);
+	}
+
+	return rs;
 
 }
-
 
 unsigned int byte_stuffing(unsigned char *data, unsigned char *stuffed_data, int length) {
 	if(DEBUG) printf("[stuffing] START\n");
@@ -36,7 +143,6 @@ unsigned int byte_stuffing(unsigned char *data, unsigned char *stuffed_data, int
 
 	return lengthAfterStuffing;
 }
-
 
 int sendSupervisionFrame(int fd, unsigned char C) {
 	if(DEBUG) printf("[sendSup] START\n");
@@ -274,14 +380,28 @@ int receiveframe(char *data, int * length) {
 
 }
 
+void atende() {
+	if(linkLayer.numTransmissions < MAXR){
+		printf("[DEBUG] Timeout %d waiting for UA, re-sending SET\n",  linkLayer.numTransmissions);
+		sendSupervisionFrame(linkLayer.fd, SET);
+		alarm(linkLayer.timeout);
+	}else{
+		printf("[DEBUG] Receiver doesnt seem to like me, I give up :(\n");
+			//llclose();
+		}
+	linkLayer.numTransmissions++;
 
-int llopen(int fd, int txrx) {
+}
+
+int llopen(char* port, int txrx) {
 	if(DEBUG) printf("[LLOPEN] START\n");
 
+	linkLayer.fd = config(port);
 	linkLayer.sequenceNumber = 0;
+	linkLayer.State = txrx;
 
 	if(txrx == TRANSMITTER) {
-
+		if(DEBUG) printf("[llopen] TRANSMITTER\n");
 		int tmpvar;
 		linkLayer.numTransmissions = 0;
 		linkLayer.timeout = MAXT;
@@ -306,7 +426,7 @@ int llopen(int fd, int txrx) {
 	}
 
 	else if (txrx == RECEIVER) {
-
+		if(DEBUG) printf("[llopen] RECEIVER\n");
 		if(DEBUG) printf("Waiting for SET\n");
 		if(receiveframe(NULL,NULL) != SET_RECEIVED)
 		{
@@ -314,7 +434,7 @@ int llopen(int fd, int txrx) {
 			 if(DEBUG) printf("DID NOT RECEIVE SET");
 			return -1;
 		}
-		sendSupervisionFrame(fd,UA);
+		sendSupervisionFrame(linkLayer.fd,UA);
 		if(DEBUG) printf("UA sent\n");
 
 		return fd;
@@ -325,15 +445,23 @@ int llopen(int fd, int txrx) {
 
 int llread(int fd, char* buffer) {
 	if(DEBUG) printf("[LLREAD] START\n");
-	int num_chars_read = 0;
-
-	int Type = receiveframe(buffer, &num_chars_read);
-
-	if(Type == DATA_RECEIVED)	{
-		if(DEBUG) printf("[LLREAD] END\n");
-		return num_chars_read;
-	}
-
+	int num_chars_read = 0, aux_num_chars = 0;
+	char* aux = malloc(MAX_SIZE);
+	
+	int Type;
+	
+	do {
+		Type= receiveframe(aux, &aux_num_chars);
+		if(Type == DATA_RECEIVED)
+		{
+			strcat(buffer, aux);
+			num_chars_read += aux_num_chars;
+		}
+		else if(Type == DISC_RECEIVED) {
+			llclose(linkLayer.fd);
+			return num_chars_read;
+		}
+	}while(1);
 	return -1;
 }
 
@@ -413,103 +541,35 @@ int llwrite(int fd, unsigned char* buffer, int length) {
        }
 
 	}
+	llclose(linkLayer.fd);
 	if(DEBUG) printf("[LLWRITE] END\n");
 	return 0;
 
 }
 
-int llclose(int fd, int txrx) {
-	if(DEBUG);
-	return 1;
-}
-
-int config(char *fd) {
-	int c, res;
-	struct termios oldtio,newtio;
-	char buf[255];
-	int i, rs, sum = 0, speed = 0;
-
-		/*
-	if ( (argc < 2) ||
-	 	((strcmp("/dev/ttyS0", argv[1])!=0) &&
-	 	(strcmp("/dev/ttyS4", argv[1])!=0) )) {
-	 	printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
-	 	exit(1);
-	 }*/
-
-
-	/*
-	Open serial port device for reading and writing and not as controlling tty
-	because we don't want to get killed if linenoise sends CTRL-C.
-	*/
-
-	close(*fd);
-	rs = open(fd, O_RDWR | O_NOCTTY );
-	if (rs <0) {perror(fd); exit(-1); }
-
-	if ( tcgetattr(rs,&oldtio) == -1) { /* save current port settings */
-		perror("tcgetattr");
-		exit(-1);
-	}
-
-	bzero(&newtio, sizeof(newtio));
-	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-	newtio.c_iflag = IGNPAR;
-	newtio.c_oflag = 0;
-
-	// set input mode (non-canonical, no echo,...)
-	newtio.c_lflag = 0;
-
-	newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
-	newtio.c_cc[VMIN]     = 1;   /* blocking read until 5 chars received*/
-
-
-
-
-	   // VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-	    //leitura do(s) próximo(s) caracter(es)
-
-
-
-
-	tcflush(rs, TCIOFLUSH);
-
-	if ( tcsetattr(rs,TCSANOW,&newtio) == -1) {
-		perror("tcsetattr");
-		exit(-1);
-	}
-
-	return rs;
-
-}
-
-int main (int argc, char** argv) {
-	int txrx;
+int llclose(int fd) {
+	if(DEBUG) printf("[LLCLOSE] START\n");
+	int tmp;
 	
-	linkLayer.fd = config(argv[1]);
+	sendSupervisionFrame(linkLayer.fd, DISC);
+	tmp = receiveframe(NULL,NULL);
 	
+	if(tmp == DISC_RECEIVED)	{
+		if(DEBUG) printf("[LLCLOSE] Expecting UA\n");
+		sendSupervisionFrame(linkLayer.fd, UA);
+		close(linkLayer.fd);
+		return 1;
+	}
 	
-	printf("Reciver - 0\nTransmitter -1\n");
-	scanf("%d", &txrx);
-
-	printf("[MAIN] Opening llopen with %d\n", txrx);
-	llopen(linkLayer.fd, txrx);
-	printf("[MAIN] LLOPEN SUCCESFULL\n");
-
-	if(txrx == TRANSMITTER)
-	{
-		unsigned char buffer[100] = "ola eu sou alguem e tuaa";
-		
-		llwrite(linkLayer.fd, buffer, 22);
+	else if(tmp == UA_RECEIVED)	{
+		if(DEBUG) printf("[LLCLOSE] EXITING AS TRANSMITTER\n");
+		close(linkLayer.fd);
+		return 1;
 	}
-	else
-	{
-		char buffer[20];
-		llread(fd,buffer);
-		puts(buffer);
-		
+	
+	else {
+		if(DEBUG) printf("[LLCLOSE] PROBLEMS\n");
+		return 1;
 	}
-
-	return 1;
 }
 
