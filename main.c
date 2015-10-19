@@ -15,6 +15,11 @@
 int main (int argc, char** argv) {
 	int txrx;
 	int fd;
+	FILE * pFile;
+	char * buffer;
+	size_t result;
+	long lSize;
+	
 	printf("Reciver - 0\nTransmitter -1\n");
 	scanf("%d", &txrx);
 
@@ -24,15 +29,28 @@ int main (int argc, char** argv) {
 
 	if(txrx == 1)
 	{
-		unsigned char buffer[24] = "ola eu sou alguem e tuaa";
+		pFile = fopen("penguin.gif", "r");
 		
-		llwrite(fd, buffer, 25);
+		// obtain file size:
+		//fseek (pFile , 0 , SEEK_END);
+		//lSize = ftell (pFile);
+		//rewind (pFile);
+		//printf("lsize = %ld", lSize);
+		buffer = (char*) malloc (sizeof(char)*10968);
+		//if (buffer == NULL) {fputs ("Memory error",stderr); exit (2);}
+			
+		//result = fread (buffer,sizeof(char),lSize,pFile);
+		//if (result != lSize) {fputs ("Reading error",stderr); exit (3);}
+		
+		llwrite(fd, buffer, lSize);
+		fclose (pFile);
+		free (buffer);
 	}
 	else
 	{
-		unsigned char buffer[30];
+		
 		llread(fd,buffer);
-		puts(buffer);
+		
 		
 	}
 
