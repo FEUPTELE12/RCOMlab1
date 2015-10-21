@@ -15,10 +15,9 @@
 int main (int argc, char** argv) {
 	int txrx;
 	int fd;
-	FILE * pFile;
-	char * buffer;
-	size_t result;
-	long lSize;
+	FILE *pFile;
+	long lSize = 10968;
+	
 	
 	printf("Reciver - 0\nTransmitter -1\n");
 	scanf("%d", &txrx);
@@ -29,29 +28,23 @@ int main (int argc, char** argv) {
 
 	if(txrx == 1)
 	{
-		pFile = fopen("penguin.gif", "r");
-		
-		// obtain file size:
-		//fseek (pFile , 0 , SEEK_END);
-		//lSize = ftell (pFile);
-		//rewind (pFile);
-		//printf("lsize = %ld", lSize);
-		buffer = (char*) malloc (sizeof(char)*10968);
-		//if (buffer == NULL) {fputs ("Memory error",stderr); exit (2);}
-			
-		//result = fread (buffer,sizeof(char),lSize,pFile);
-		//if (result != lSize) {fputs ("Reading error",stderr); exit (3);}
-		
+		unsigned char* buffer = (unsigned char*) malloc (sizeof(unsigned char) * lSize);
+		//pFile = fopen("test.txt", "r" );
+		//pFile = fopen("test_file.dat", "rb");
+		pFile = fopen("penguin.gif", "rb");
+		fread(buffer,sizeof(unsigned char), lSize, pFile);
+		puts(buffer);
 		llwrite(fd, buffer, lSize);
-		fclose (pFile);
-		free (buffer);
 	}
 	else
 	{
-		
+		unsigned char* buffer = (unsigned char*) malloc (sizeof(unsigned char) * lSize);
+		//pFile = fopen("test_clone.txt", "w");
+		//pFile = fopen("test_file_clone.dat", "wb");
+		pFile = fopen("penguin_clone.gif", "wb");
 		llread(fd,buffer);
-		
-		
+		fwrite( buffer,sizeof(unsigned char), lSize, pFile);
+		//printf("Buffer read: %s\n", buffer);
 	}
 
 	return 1;

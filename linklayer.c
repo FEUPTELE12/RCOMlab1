@@ -20,7 +20,7 @@
 #define TRUE 1
 #define MAXR 3 //no maximo de falhas
 #define MAXT 1 //valor do temporizador
-#define MAX_SIZE 1000 //Tamanho maximo de uma frame APÓS stuffing
+#define MAX_SIZE 256 //Tamanho maximo de uma frame APÓS stuffing
 
 
 #define FLAG 0x7E
@@ -43,7 +43,7 @@
 #define RR_RECEIVED 4
 #define REJ_RECEIVED 5
 
-#define DEBUG 0
+#define DEBUG 1
 
 
 int fd, txrx, N;
@@ -59,7 +59,7 @@ struct linkLayerStruct{
 	unsigned int sequenceNumber;
 	unsigned int timeout;//valor do temporizador
 	int frameLength;
-	unsigned char frame[MAX_SIZE];
+	unsigned char frame[((MAX_SIZE*2)+6)];
 	unsigned int numTransmissions;
 	int State ;//Transmitter Reciver
 	
@@ -177,7 +177,7 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 
 int sendInformationFrame(unsigned char * data, int length) {
 	if(DEBUG) printf("\n[SENDIF] START\n[SENDIF]length = %d", length);
-	unsigned char stuffed_data[MAX_SIZE];
+	unsigned char stuffed_data[(MAX_SIZE*2)];
 	int C = linkLayer.sequenceNumber << 6;
 	int BCC1 = A ^ C;
 	int i;
@@ -472,19 +472,21 @@ int llread(int fd,unsigned char* buffer) {
 	//= calloc(MAX_SIZE, sizeof(unsigned char));
 	linkLayer.sequenceNumber = 0;
 	int Type;
-	
+	int i = 0;
 	
 	do {
 		Type= receiveframe(aux, &aux_num_chars);
-		aux[MAX_SIZE] = '\0';
+		//aux[aux_num_chars] = '\0';
 			
 		if(DEBUG) printf("aux = %s, aux_num_chars = %d\n",aux, aux_num_chars);
 		
 		if(Type == DATA_RECEIVED)
 		{
-			strcat(buffer, aux);
+			memcpy(buffer + (i * MAX_SIZE), aux, aux_num_chars);
+			i++;
 			num_chars_read += aux_num_chars;
 			aux_num_chars = 0;
+			//puts(buffer);
 		}
 		else if(Type == DISC_RECEIVED) {
 			llclose(linkLayer.fd);
@@ -498,8 +500,8 @@ int llwrite(int fd, unsigned char* buffer, int length) {
     if(DEBUG) printf("\n[LLWRITE] START\n");
 
 	linkLayer.timeout = 0;
-	int CompleteFrames =  length / MAX_SIZE;
-	int remainingBytes =  length % MAX_SIZE;
+	int CompleteFrames =  length / (MAX_SIZE);
+	int remainingBytes =  length % (MAX_SIZE);
 	int flag = 1;
 	if(DEBUG)printf("[LLWRITE] lenght = %d, complete Frames = %d , remaining bytes = %d\n", length, CompleteFrames, remainingBytes);
 	//(void) signal(SIGALRM, Timeout_RR);
@@ -605,4 +607,5 @@ int llclose(int fd) {
 		return 1;
 	}
 }
+
 
