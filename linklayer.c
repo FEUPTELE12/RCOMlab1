@@ -13,9 +13,6 @@
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-#define FALSE 0
-#define TRUE 1
-
 #define FLAG 0x7E
 #define ESC 0x7D
 #define STFF 0x20
@@ -26,10 +23,13 @@
 #define REJ 0x01
 #define A 0x03 //Comando enviado pelo emissor e resposta enviada pelo receptor
 
-
+//FOR IDENTIFICACION
+#define FALSE 0
+#define TRUE 1
 #define RECEIVER 0
 #define TRANSMITTER 1
 
+//TO RECEIVE DATA
 #define DATA_RECEIVED 0
 #define SET_RECEIVED 1
 #define DISC_RECEIVED 2
@@ -39,15 +39,18 @@
 #define REJ_RECEIVED 6
 #define BAD_REJ_RECEIVED 7
 
+//FOR DEBUGING
 #define DEBUG 1
 
+//EXTERNAL VARIABLES
 long BAUDRATE = 9600; //38400?
 long MAXR = 3; //no maximo de falhas
 long MAXT = 1; //valor do temporizador
 long MAX_SIZE = 256; //Tamanho maximo de uma frame APÓS stuffing
 
+// FOR ALARM SETUP
 int Conts = 0;
-int alarm_flag = 1;
+int alarm_flag = FALSE;
 
 struct linkLayerStruct{
 
@@ -66,7 +69,7 @@ struct linkLayerStruct{
 void Timeout() {
 
 	if(DEBUG) printf("[Timeout_RR] alarme = %d\n", linkLayer.numTransmissions);
-	alarm_flag = 1;
+	alarm_flag = TRUE;
 	linkLayer.numTransmissions++;
 
 }
@@ -135,6 +138,7 @@ int config(char *fd) {
 		exit(-1);
 	}
 
+	(void) signal(SIGALRM, Timeout);
 	return rs;
 
 }
@@ -222,7 +226,7 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 
 
 // TODO VERIFICAÇões
-int sendInformationFrame(unsigned char * data, int length) {
+
 	if(DEBUG) printf("\n[SENDIF] START\n[SENDIF]length = %d", length);
 
 	int C = linkLayer.sequenceNumber << 6;
@@ -447,8 +451,6 @@ int receiveframe(unsigned char *data, int* length) {
 
 int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning) {
 
-		(void) signal(SIGALRM, Timeout);
-
 		for(linkLayer.numTransmissions = 0; linkLayer.numTransmissions <= MAXT; ) {
 			if(DEBUG) printf("[LLWRITE] Frames = %d\n", *i);
 
@@ -503,11 +505,8 @@ int llopen(char* port, int txrx) {
 	linkLayer.frame = (unsigned char*) malloc((2*MAX_SIZE)+6);
 
 	if(txrx == TRANSMITTER) {
-		if(DEBUG) printf("[llopen] TRANSMITTER\n");
+		if(DEBUG) printf("[llopen] TRANSMITTER\n[llopen] Send SET\n");
 
-		(void) signal(SIGALRM, Timeout);
-		
-		if(DEBUG) printf("[llopen] Send SET\n");
 		sendSupervisionFrame(linkLayer.fd, SET);
 
 		if(DEBUG) printf("[llopen] EXPETING UA\n");
@@ -613,12 +612,20 @@ int llclose(int fd) {
 	if(tmp == DISC_RECEIVED)	{
 		if(DEBUG) printf("[LLCLOSE] Expecting UA\n");
 		sendSupervisionFrame(linkLayer.fd, UA);
+		if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
+      perror("tcsetattr");
+      exit(-1);
+    }
 		close(linkLayer.fd);
 		return 1;
 	}
 
 	else if(tmp == UA_RECEIVED)	{
 		if(DEBUG) printf("[LLCLOSE] EXITING AS RECEIVER\n");
+		if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
+      perror("tcsetattr");
+      exit(-1);
+    }
 		close(linkLayer.fd);
 		return 1;
 	}
