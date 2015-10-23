@@ -16,10 +16,10 @@ int main (int argc, char** argv) {
 	int txrx;
 	int fd;
 	FILE *pFile;
-	
+
 	long lSize = 10968;
 	//long lSize = 256;
-	
+
 	printf("Reciver - 0\nTransmitter -1\n");
 	scanf("%d", &txrx);
 
