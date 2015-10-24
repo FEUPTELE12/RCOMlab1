@@ -49,8 +49,7 @@ long MAXT = 1; //valor do temporizador
 long MAX_SIZE = 50; //Tamanho maximo de uma frame APÓS stuffing
 
 // FOR ALARM SETUP
-int Conts = 0;
-int alarm_flag = FALSE;
+#define DATA 0x00
 
 struct linkLayerStruct{
 
@@ -438,6 +437,22 @@ int receiveframe(unsigned char *data, int* length) {
 
 }
 
+void Timeout() {
+
+	if(linkLayer.numTransmissions < MAXR){
+		printf("[DEBUG] Timeout %d\n",  linkLayer.numTransmissions);
+		if(linkLayer.alarm_char != DATA)
+			sendSupervisionFrame(linkLayer.fd, linkLayer.alarm_char);
+		else
+			sendInformationFrame(linkLayer.frame, linkLayer.frameLength);
+		alarm(linkLayer.timeout);
+	}else{
+		printf("[DEBUG] Receiver doesnt seem to like me, I give up :(\n");
+		exit(-1);
+		}
+	linkLayer.numTransmissions++;
+}
+
 int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning) {
 
 	(void) signal(SIGALRM, Timeout);
@@ -475,21 +490,6 @@ int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning)
 	linkLayer.numTransmissions = 0;
 }
 
-void Timeout {
-
-	if(linkLayer.numTransmissions < MAXR){
-		printf("[DEBUG] Timeout %d waiting for UA, re-sending SET\n",  linkLayer.numTransmissions);
-		if(linkLayer.alarm_char != DATA)
-			sendSupervisionFrame(linkLayer.fd, linkLayer.alarm_char);
-		else
-			sendInformationFrame(linkLayer.frame, linkLayer.frameLength)
-		alarm(linkLayer.timeout);
-	}else{
-		printf("[DEBUG] Receiver doesnt seem to like me, I give up :(\n");
-		exit(-1);
-		}
-	linkLayer.numTransmissions++;
-}
 
 int llopen(char* port, int txrx) {
 	if(DEBUG) printf("\n[LLOPEN] START\n");
@@ -594,7 +594,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 	linkLayer.numTransmissions = 0;
 	linkLayer.timeout = MAXT;
 	linkLayer.sequenceNumber = 0;
-	linkLayer.alarm_flag = DATA;
+	linkLayer.alarm_char = DATA;
 
 
 	for(i = 0; i < CompleteFrames; i++) write_frame(fd, buffer, 0, &i , FALSE);
@@ -616,14 +616,14 @@ int llclose(int fd) {
 	tmp = receiveframe(NULL,NULL);
 
 	if(tmp == DISC_RECEIVED)	{
-		printf("[RS-232] Port Closing\n");
+		printf("[RS-232] Closing Port, successful transmission\n");
 		sendSupervisionFrame(fd, UA);
 		close(fd);
 		return 1;
 	}
 
 	else if(tmp == UA_RECEIVED)	{
-		printf("Closing Port, Recepcion successful\n");
+		printf("[RS-232] Closing Port, Recepcion successful\n");
 		close(fd);
 		return 1;
 	}

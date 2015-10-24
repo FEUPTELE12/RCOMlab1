@@ -28,7 +28,6 @@ int main (int argc, char** argv) {
 		//pFile = fopen("test_file.dat", "rb");
 		pFile = fopen("penguin.gif", "rb");
 		fread(buffer,sizeof(unsigned char), lSize, pFile);
-		puts(buffer);
 		llwrite(fd, buffer, lSize);
 	}
 	else
