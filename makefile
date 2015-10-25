@@ -1,3 +1,3 @@
 all:
-	gcc -c linklayer.c linklayer.h application.c
-	gcc linklayer.o application.o -o src
+	gcc -c linklayer.c linklayer.h main.c
+	gcc linklayer.o main.o -o src
