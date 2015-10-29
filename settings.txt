@@ -13,10 +13,10 @@ Max frame size
 50
 
 Timeout value
-3
+2
 
 Maximun number of timeouts
-6
+3
 
 filename
 penguin.gif

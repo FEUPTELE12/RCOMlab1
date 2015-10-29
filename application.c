@@ -249,14 +249,6 @@ int main (int argc, char** argv) {
 		unsigned char* buffer;
 		unsigned char* data;
 		applicationLayer.sequenceNumber = 0;
-
-
-		do{
-		pFile = fopen(filename, "wb");
-		if(pFile == NULL);
-			scanf("%s", filename);
-			fgets(filename, sizeof(filename), stdin);
-		}while(pFile == NULL);
 		
 		rFileSize = receiveControlPackage();
 		
