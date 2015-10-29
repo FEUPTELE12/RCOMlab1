@@ -52,6 +52,12 @@
 #define BAD_BBC_RECEIVED 8
 #define BAD_DATA_RECEIVED 9
 
+<<<<<<< HEAD
+=======
+//FOR DEBUGING
+#define DEBUG 0
+
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 //EXTERNAL VARIABLES
 long BAUDRATE = 9600; //38400?
 long MAXR = 3; 		  	//Maximum number atents
@@ -190,6 +196,15 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 
 	unsigned char BBC1 = A ^ C;
 
+<<<<<<< HEAD
+=======
+	if(DEBUG){
+		printf("[sendSup] LinkLayer Sequence number: %d\n" , linkLayer.sequenceNumber);
+		printf("[sendSup]Send supervision 0x%x", C);
+		printf("[sendSup] A = %x, C= %x, BCC1 = %x\n", A, C, BBC1);
+	}
+
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 	//constructing frame
 	frame[0] = FLAG;
 	frame[1] = A;
@@ -207,6 +222,10 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 }
 
 int sendInformationFrame(unsigned char * data, int length) {
+<<<<<<< HEAD
+=======
+	if(DEBUG) printf("\n[SENDIF] START\n[SENDIF]length = %d, sequenceNumber = %d", length, linkLayer.sequenceNumber);
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 
 	//verificacions
 	if(data == NULL &&length <= 0)
@@ -297,6 +316,11 @@ int receiveframe(unsigned char *data, int* length) {
 				}
 
 				else if(*charread == (RR | ((linkLayer.sequenceNumber) << 7))) {
+<<<<<<< HEAD
+=======
+					if(DEBUG) printf("RR\n");
+					//linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 					Type = RR_RECEIVED;
 					state = 3;
 				}
@@ -414,6 +438,7 @@ int receiveframe(unsigned char *data, int* length) {
 void Timeout() {
 
 	if(linkLayer.numTransmissions < MAXR-1){
+<<<<<<< HEAD
 		printf("[TIMEOUT] Timeout %d -> ", linkLayer.numTransmissions);
 		if(!linkLayer.alarm_inf){
 			printf("Sending Supervision Frame\n");
@@ -424,6 +449,14 @@ void Timeout() {
 			if(!sendInformationFrame(linkLayer.frame, linkLayer.frameLength)) exit(-1);
 		}
 		else exit(-1);
+=======
+		printf("[TIMEOUT] Timeout %d\n\n",  linkLayer.numTransmissions+1);
+		if(linkLayer.alarm_char != DATA)
+			if(!sendSupervisionFrame(linkLayer.fd, linkLayer.alarm_char)) exit(-1);
+		else if(linkLayer.alarm_char == DATA)
+			if(!sendInformationFrame(linkLayer.frame, linkLayer.frameLength)) exit(-1);
+		else printf("invalid = %x", linkLayer.alarm_char);
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 		alarm(linkLayer.timeout);
 	}
 	else if (linkLayer.numTransmissions == MAXR-1) {
@@ -438,6 +471,7 @@ void Timeout() {
 int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning) {
 
 	(void) signal(SIGALRM, Timeout); //
+
 
 	//SENDING FRAME
 	if(remaning == FALSE) {
@@ -457,12 +491,24 @@ int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning)
 	alarm(linkLayer.timeout);
 	int tmp = receiveframe(NULL,NULL);
 
+<<<<<<< HEAD
+=======
+
+	if(DEBUG) printf("[LLWRITE] tmp : %d\n", tmp);
+
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 	if(tmp != RR_RECEIVED) {
 		linkLayer.sequenceNumber = linkLayer.sequenceNumber^1;
 		*i = *i - 1;
 		(void) signal(SIGALRM, SIG_IGN);
 
+<<<<<<< HEAD
 		if( (tmp == BAD_RR_RECEIVED) || (tmp = BAD_REJ_RECEIVED)) rej_send_received++;
+=======
+			if(DEBUG) printf("[LLWRITE]BAD RR || BAD REJ (%d)-> SEND LAST FRAME\n", tmp);
+			rej_send_received++;
+		}
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 		else if(tmp == REJ_RECEIVED) rej_send_received++;
 		else return -1;
 	}
@@ -528,6 +574,7 @@ int llread(int fd,unsigned char* buffer) {
 		{
 			linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
 			sendSupervisionFrame(linkLayer.fd, RR);
+			//linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
 			memcpy(buffer + num_chars_read, aux, aux_num_chars);
 			num_chars_read += aux_num_chars;
 			aux_num_chars = 0;
@@ -551,8 +598,13 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 	int remainingBytes =  length % (MAX_SIZE);
 	int flag = 1;
 	int i;
+<<<<<<< HEAD
 	linkLayer.alarm_inf = TRUE;
 	linkLayer.sequenceNumber = 0;
+=======
+	linkLayer.sequenceNumber = 0;
+	if(DEBUG) printf("[LLWRITE] lenght = %d, complete Frames = %d , remaining bytes = %d\n", length, CompleteFrames, remainingBytes);
+>>>>>>> f1082222ecfa4c643dfb101e4a0de90451e0d99d
 
 	linkLayer.alarm_char = DATA;
 
