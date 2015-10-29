@@ -4,7 +4,7 @@ RS-323 Serial Port Connection
 1st RCOM lab work
 --------------------------------
  
-Port Conection Using *RS-232 protocol*
+Serial Port Protocol implementacion for RCOM course (FEUP)
  
 
 INSTALACION 
@@ -21,3 +21,5 @@ EXECUTE
 1. $ ./src/ /dev/ttyS*
 2. Choose Receptor and Transimitor
 3. $make clean up to clean source files
+
+**********************
