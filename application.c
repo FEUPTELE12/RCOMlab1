@@ -19,13 +19,11 @@
 
 #define DEBUG 1
 
-//[IMPORTANTE] em linklayer.c, não deviam ser unsigned chars em vez de int??
 
 struct applicationLayerstruct{
 
 	int fileDescriptor;
 	int status;
-	//unsigned int sequenceNumber;  //Deixar como unsigned int??
 	unsigned char sequenceNumber;
 	unsigned char package[APP_MAX_SIZE];
 
@@ -85,8 +83,7 @@ int receiveControlPackage(void){
 	int size;
 	int i;
 	
-	//Em vez de buffer fazia mais sentido usar o applicationLayer.app_frame nao???
-	unsigned char* buffer = (unsigned char*) malloc (sizeof(unsigned char) * 5);  //Mudar o "5" noutros casos!
+	unsigned char* buffer = (unsigned char*) malloc (sizeof(unsigned char) * 5);
 		
 	llread(applicationLayer.fileDescriptor ,buffer);
 	
@@ -124,8 +121,6 @@ int receiveDataPackage(unsigned char *data){
 	
 	llread(applicationLayer.fileDescriptor, applicationLayer.package);
 	
-	
-	
 	//Extract the data from the app_frame
 	//for(i=0; i < (completePackages+1); i++){
 		
@@ -148,14 +143,28 @@ int receiveDataPackage(unsigned char *data){
 	return K;
 }
 
-int setting();
+int setting(char *filename)
 {
+	char buffer[256];
+	int i;
 	FILE* fd = fopen("settings.txt", "r");
 	if(fd == NULL){
-		printf("Problems finding settings.txt, include in the folder\n")
+		printf("Problems finding settings.txt, include in the folder\n");
 		return -1;
 	}
-	fseek(F
+	
+	for(i = 0; i < 26; i++) fscanf(fd, "%s", buffer);
+	BAUDRATE = atoi(buffer);
+	for(i = 0; i < 4; i++) fscanf(fd, "%s", buffer);
+	MAX_SIZE = atoi(buffer);
+	for(i = 0; i < 3; i++) fscanf(fd, "%s", buffer);
+	MAXT = atoi(buffer);
+	for(i = 0; i < 5; i++) fscanf(fd, "%s", buffer);
+	MAXR = atoi(buffer);
+	for(i = 0; i < 5; i++) fscanf(fd, "%s", buffer);
+	memcpy(filename, buffer, strlen(buffer));
+	return 1;
+}
 	
 int main (int argc, char** argv) {
 	int txrx;
@@ -163,29 +172,22 @@ int main (int argc, char** argv) {
 	int i;
 	char filename[30];
 	FILE *pFile;
-	int lSize; //= 10968;
-	unsigned char L = 0; //Representa quantos bytes ocupa lSize
-
+	int lSize;
+	unsigned char L = 0;
+	if(!setting(filename)) return -1;
+	//USER INTERFACE
 	printf("Receiver - 0\nTransmitter -1\n");
 	scanf("%d", &txrx);
-
+	
 	applicationLayer.status = txrx;
-	printf("Write name of file: ");
-	fgets(filename, sizeof(filename), stdin);
+	
 	write(2, "\n[APP] Opening Port, Stand by", sizeof("\n[APP] Opening Port, Stand by"));
-	applicationLayer.fileDescriptor = llopen(argv[1], applicationLayer.status);
+	applicationLayer.fileDescriptor = llopen(argv[1], applicationLayer.status); //opening port
 	printf("\n[APP] Port Open");
 
 
 	if(txrx == 1)  //TRANSMITTER 
 	{
-		do{
-		pFile = fopen(filename, "rb");
-		if(pFile == NULL);
-			printf("Bad name, try again: ");
-			fgets(filename, sizeof(filename), stdin);
-		}while(pFile == NULL);
-		
 		
 		fseek(pFile, 0, SEEK_END);
 		lSize = ftell(pFile);
@@ -237,6 +239,8 @@ int main (int argc, char** argv) {
 
 		//llclose(fd); //Closing Connection
 	}
+	//END TRANSMITER
+	
 	else  //RECEIVER
 	{
 		//Devemos assumir que o receptor não faz ideia de quanto é o tamanho do ficheiro
@@ -248,9 +252,9 @@ int main (int argc, char** argv) {
 
 
 		do{
-		scanf("%s", filename);
 		pFile = fopen(filename, "wb");
 		if(pFile == NULL);
+			scanf("%s", filename);
 			fgets(filename, sizeof(filename), stdin);
 		}while(pFile == NULL);
 		
@@ -309,6 +313,7 @@ int main (int argc, char** argv) {
 		fwrite( data, sizeof(unsigned char), dataBytesReceived, pFile);
 
 		}
+		//END RECEIVER
 		
 	return 1;
 }
