@@ -12,6 +12,7 @@ INSTALACION
 
 
 - Change Baudrate, and other setings on settings.txt.
+- **IMPORTANT** Be carfull on using this file, change only the values you want! **IMPORTANT**
 - Go to terminal and use '$ make' commando to compile.
 
 
