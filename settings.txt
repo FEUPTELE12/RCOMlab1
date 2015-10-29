@@ -1,0 +1,22 @@
+#########################################
+#                                       #
+# Change this to make settings diferent #
+#				        #
+# IMPORTANT : DONT CHANGE LINE SETTING  #
+#                                       #
+#########################################
+
+BaudRate:
+9600
+
+Max frame size
+50
+
+Timeout value
+2
+
+Maximun number of timeouts
+3
+
+filename
+penguin.gif
