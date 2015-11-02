@@ -143,7 +143,7 @@ int receiveDataPackage(unsigned char *data){
 	return K;
 }
 
-int setting(char *filename)
+int setting(void)
 {
 	char buffer[256];
 	int i;
@@ -161,8 +161,8 @@ int setting(char *filename)
 	MAXT = atoi(buffer);
 	for(i = 0; i < 5; i++) fscanf(fd, "%s", buffer);
 	MAXR = atoi(buffer);
-	for(i = 0; i < 5; i++) fscanf(fd, "%s", buffer);
-	memcpy(filename, buffer, strlen(buffer));
+	//for(i = 0; i < 5; i++) fscanf(fd, "%s", buffer);
+	//memcpy(filename, buffer, strlen(buffer));
 	return 1;
 }
 	
@@ -174,20 +174,30 @@ int main (int argc, char** argv) {
 	FILE *pFile;
 	int lSize;
 	unsigned char L = 0;
-	if(!setting(filename)) return -1;
+	if(!setting()) return -1;
 	//USER INTERFACE
 	printf("Receiver - 0\nTransmitter -1\n");
 	scanf("%d", &txrx);
 	
 	applicationLayer.status = txrx;
 	
-	write(2, "\n[APP] Opening Port, Stand by", sizeof("\n[APP] Opening Port, Stand by"));
+	write(2, "\n[APP] Opening Port, Stand by\n", sizeof("\n[APP] Opening Port, Stand by\n"));
 	applicationLayer.fileDescriptor = llopen(argv[1], applicationLayer.status); //opening port
-	printf("\n[APP] Port Open");
-
+	printf("ola?");
+	write(2, "[APP] Port Open\n", sizeof("\n[APP] Port Open"));
 
 	if(txrx == 1)  //TRANSMITTER 
 	{
+		printf("Name of file: ");
+		scanf("%s", filename);
+		do
+		{
+			if((pFile = fopen(filename, "rb")) == NULL) {
+				printf("Try again: ");
+				scanf("%s", filename);
+			}
+		} while(pFile == NULL);		
+		
 		
 		fseek(pFile, 0, SEEK_END);
 		lSize = ftell(pFile);
@@ -211,8 +221,6 @@ int main (int argc, char** argv) {
 		
 		unsigned char* buffer = (unsigned char*) malloc (sizeof(unsigned char) * lSize);
 		
-		
-		pFile = fopen(filename, "rb");
 		fread(buffer,sizeof(unsigned char), lSize, pFile);
 
 		sendAppControlPackage(APP_START, lSize,L);//START
@@ -249,6 +257,16 @@ int main (int argc, char** argv) {
 		unsigned char* buffer;
 		unsigned char* data;
 		applicationLayer.sequenceNumber = 0;
+		
+		printf("name of file: ");
+		scanf("%s", filename);
+		do
+		{
+			if((pFile = fopen(filename, "wb")) == NULL) {
+				printf("Try again: ");
+				scanf("%s", filename);
+			}
+		} while(pFile == NULL);	
 		
 		rFileSize = receiveControlPackage();
 		

@@ -77,6 +77,7 @@ struct linkLayerStruct{ //IMPORTANT INFORMACION
 	int State ;										 // Transmitter/Reciver
 	unsigned char alarm_char;			 // Command char for alarm
 	int alarm_inf;
+
 }linkLayer;
 
 int config(char *fd) {
@@ -132,6 +133,7 @@ int config(char *fd) {
 	}
 
 	srand((unsigned int)time(NULL)); //for error
+	printf("OPEN SUCCECFULL\n");
 	return rs;
 
 }
