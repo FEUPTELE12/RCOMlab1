@@ -62,8 +62,7 @@ long received = 0;
 long timeout_time = 0;
 long rej_send_received = 0;
 long error = 0; //Bit Error Rate
-// FOR ALARM
-int AFLAG = 0;
+// FOR ALARM SETUP
 #define DATA 0x00
 
 struct linkLayerStruct{ //IMPORTANT INFORMACION
@@ -78,7 +77,6 @@ struct linkLayerStruct{ //IMPORTANT INFORMACION
 	int State ;										 // Transmitter/Reciver
 	unsigned char alarm_char;			 // Command char for alarm
 	int alarm_inf;
-
 }linkLayer;
 
 int config(char *fd) {
@@ -143,10 +141,7 @@ unsigned char errorchar(void){
 	unsigned char c = 0x00;
 
 	for (i = 0; i < 8; i++)
-	{
-		if(error <= rand()%100000000)
-			c= c ^ 1 << i;
-	}
+		c = c ^ (!(error <= rand()%100000000) << i);
 
 	return c;
 }
@@ -207,7 +202,7 @@ int sendSupervisionFrame(int fd, unsigned char C) {
 	n_bytes = write(fd,frame, 5);
 	if(n_bytes != 5)
 		return -1;
-	printf("[Supervisionframe] Sending %x\n", frame[2]);
+
 	return n_bytes;
 }
 
@@ -216,9 +211,8 @@ int sendInformationFrame(unsigned char * data, int length) {
 	//verificacions
 	if(data == NULL &&length <= 0)
 		return -1;
-	if(Aflag) linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
+
 	int C = (linkLayer.sequenceNumber << 6); //Comand is only sequence number on the 6 bit
-	if(Aflag) linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
 	int BCC1 = (A ^ C); //BCC1 xor adress and Command
 	int BCC2 = data[0]; //BCC2 xor data values
 	unsigned int lengthAfterStuffing;
@@ -303,12 +297,12 @@ int receiveframe(unsigned char *data, int* length) {
 				}
 
 				else if(*charread == (RR | ((linkLayer.sequenceNumber) << 7))) {
-					Type = RR_RECEIVED;
+					Type = BAD_RR_RECEIVED;
 					state = 3;
 				}
 
 				else if(*charread == (RR | ((linkLayer.sequenceNumber^1)  << 7))) { //BAD RR
-					Type = BAD_RR_RECEIVED;
+					Type = RR_RECEIVED;
 					state = 3;
 				}
 
@@ -420,14 +414,9 @@ int receiveframe(unsigned char *data, int* length) {
 void Timeout() {
 
 	if(linkLayer.numTransmissions < MAXR-1){
-
-		if(linkLayer.numTransmissions == 0 && linkLayer.alarm_inf){
-			AFLAG = 1;
-			linkLayer.sequenceNumber = linkLayer.sequenceNumber^1; //se entrar aqui troca o linklayer
-		}
-		printf("[TIMEOUT] Timeout %d -> ", linkLayer.numTransmissions+1);
+		printf("[TIMEOUT] Timeout %d -> ", linkLayer.numTransmissions);
 		if(!linkLayer.alarm_inf){
-			printf("Sending Supervision Frame (%x)\n", linkLayer.alarm_char);
+			printf("Sending Supervision Frame\n");
 			if(!sendSupervisionFrame(linkLayer.fd, linkLayer.alarm_char)) exit(-1);
 		}
 		else if(linkLayer.alarm_inf) {
@@ -438,7 +427,7 @@ void Timeout() {
 		alarm(linkLayer.timeout);
 	}
 	else if (linkLayer.numTransmissions == MAXR-1) {
-		printf("[TIMEOUT] Timeout %ld -> Port closing, didn't get any response\n", MAXR);
+		printf("[TIMEOUT] Port closing, didn't get any response\n");
 		close(linkLayer.fd);
 		exit(-1);
 	}
@@ -463,14 +452,13 @@ int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning)
   }
 
 	//after sending frame switch sequence Number
-	AFLAG =0;
-	linkLayer.sequenceNumber = linkLayer.sequenceNumber^1;
+
+
 	alarm(linkLayer.timeout);
 	int tmp = receiveframe(NULL,NULL);
 
-	if(tmp != RR_RECEIVED) {
+	if(tmp != RR_RECEIVED) { //Bad RR being the oldest RR
 		*i = *i - 1;
-		AFLAG = 0;
 		(void) signal(SIGALRM, SIG_IGN);
 
 		if( (tmp == BAD_RR_RECEIVED) || (tmp = BAD_REJ_RECEIVED)) rej_send_received++;
@@ -478,11 +466,9 @@ int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning)
 		else return -1;
 	}
 	else if(tmp == RR_RECEIVED){
-		AFLAG = 0;
 		(void) signal(SIGALRM, SIG_IGN);
-		if(AFLAG == 1) linkLayer.sequenceNumber = linkLayer.sequenceNumber^1;
+		linkLayer.sequenceNumber = linkLayer.sequenceNumber^1;
 	}
-
 	linkLayer.numTransmissions = 0;
 }
 
@@ -498,6 +484,8 @@ int llopen(char* port, int txrx) {
 	linkLayer.frame = (unsigned char*) malloc((2*MAX_SIZE)+6);
 	linkLayer.alarm_char = SET;
 	linkLayer.alarm_inf = FALSE;
+
+	//printf("[RS-232] Port open - Starting");
 
 	if(txrx == TRANSMITTER) {
 		linkLayer.State = TRANSMITTER;
@@ -551,7 +539,7 @@ int llread(int fd,unsigned char* buffer) {
 			sendSupervisionFrame(linkLayer.fd, REJ);
 		}
 		else if(Type == DISC_RECEIVED) {
-			if(!llclose(linkLayer.fd)) printf("Problems Closing");
+			llclose(linkLayer.fd);
 			return num_chars_read;
 		}
 	} while(1);
@@ -576,7 +564,7 @@ int llwrite(int fd, unsigned char* buffer, int length) {
 
 	(void) signal(SIGALRM, Timeout);
 
-	if(!llclose(linkLayer.fd)) printf("problems closing");
+	llclose(linkLayer.fd);
 
 	return 0;
 
@@ -595,8 +583,9 @@ int llclose(int fd) {
 
 		if (tmp == DISC_RECEIVED) {
 			(void) signal(SIGALRM, SIG_IGN); //closing Timeout if received
+
 			sendSupervisionFrame(fd, UA);
-			sleep(1);
+						sleep(1);
 			close(fd);
 			return 1;
 
