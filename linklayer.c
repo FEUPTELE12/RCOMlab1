@@ -143,7 +143,10 @@ unsigned char errorchar(void){
 	unsigned char c = 0x00;
 
 	for (i = 0; i < 8; i++)
-		c = c ^ (!(error <= rand()%100000000) << i); //meter nas ordem dos 1000 para ver resultado
+	{
+		if(error <= rand()%100000000)
+			c= c ^ 1 << i;
+	}
 
 	return c;
 }
@@ -213,8 +216,9 @@ int sendInformationFrame(unsigned char * data, int length) {
 	//verificacions
 	if(data == NULL &&length <= 0)
 		return -1;
-
+	if(Aflag) linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
 	int C = (linkLayer.sequenceNumber << 6); //Comand is only sequence number on the 6 bit
+	if(Aflag) linkLayer.sequenceNumber = linkLayer.sequenceNumber ^ 1;
 	int BCC1 = (A ^ C); //BCC1 xor adress and Command
 	int BCC2 = data[0]; //BCC2 xor data values
 	unsigned int lengthAfterStuffing;
@@ -465,10 +469,8 @@ int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning)
 	int tmp = receiveframe(NULL,NULL);
 
 	if(tmp != RR_RECEIVED) {
-
-		if(AFLAG == 0) linkLayer.sequenceNumber = linkLayer.sequenceNumber^1;
-		AFLAG = 0;
 		*i = *i - 1;
+		AFLAG = 0;
 		(void) signal(SIGALRM, SIG_IGN);
 
 		if( (tmp == BAD_RR_RECEIVED) || (tmp = BAD_REJ_RECEIVED)) rej_send_received++;
@@ -476,9 +478,9 @@ int write_frame(int fd, unsigned char* buffer, int length, int* i ,int remaning)
 		else return -1;
 	}
 	else if(tmp == RR_RECEIVED){
+		AFLAG = 0;
 		(void) signal(SIGALRM, SIG_IGN);
 		if(AFLAG == 1) linkLayer.sequenceNumber = linkLayer.sequenceNumber^1;
-		AFLAG = 0;
 	}
 
 	linkLayer.numTransmissions = 0;
