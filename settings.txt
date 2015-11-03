@@ -1,7 +1,7 @@
 #########################################
 #                                       #
 # Change this to make settings diferent #
-#				        				#
+#				        #
 # IMPORTANT : DONT CHANGE LINE SETTING  #
 #                                       #
 #########################################
