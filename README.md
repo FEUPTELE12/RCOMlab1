@@ -21,6 +21,8 @@ EXECUTE
 
 1. $ ./src/ /dev/ttyS*
 2. Choose Receptor and Transimitor
-3. $make clean up to clean source files
+3. Type file name
+4. See file being transfered
+5. Be Happy!!
 
 **********************
